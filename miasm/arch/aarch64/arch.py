@@ -16,6 +16,7 @@ from miasm.core.modint import mod_size2int
 from miasm.core.asm_ast import AstInt, AstId, AstMem, AstOp
 from miasm.ir.ir import color_expr_html
 from miasm.core import utils
+from miasm.core.utils import BRACKET_O, BRACKET_C
 
 log = logging.getLogger("aarch64dis")
 console_handler = logging.StreamHandler()
@@ -394,30 +395,21 @@ class instruction_aarch64(instruction):
             )
         elif isinstance(expr, m2_expr.ExprOp) and expr.op == "postinc":
             if int(expr.args[1]) != 0:
-                return "[%s], %s" % (
-                    color_expr_html(expr.args[0], loc_db),
-                    color_expr_html(expr.args[1], loc_db)
-                )
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + BRACKET_C + ", " + color_expr_html(expr.args[1], loc_db)
             else:
-                return "[%s]" % (color_expr_html(expr.args[0], loc_db))
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + BRACKET_C
         elif isinstance(expr, m2_expr.ExprOp) and expr.op == "preinc_wb":
             if int(expr.args[1]) != 0:
-                return "[%s, %s]!" % (
-                    color_expr_html(expr.args[0], loc_db),
-                    color_expr_html(expr.args[1], loc_db)
-                )
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + ", " + color_expr_html(expr.args[1], loc_db) + BRACKET_C + '!'
             else:
-                return "[%s]" % (color_expr_html(expr.args[0], loc_db))
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + BRACKET_C
         elif isinstance(expr, m2_expr.ExprOp) and expr.op == "preinc":
             if len(expr.args) == 1:
-                return "[%s]" % (color_expr_html(expr.args[0], loc_db))
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + BRACKET_C
             elif not isinstance(expr.args[1], m2_expr.ExprInt) or int(expr.args[1]) != 0:
-                return "[%s, %s]" % (
-                    color_expr_html(expr.args[0], loc_db),
-                    color_expr_html(expr.args[1], loc_db)
-                )
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + ", " + color_expr_html(expr.args[1], loc_db) + BRACKET_C
             else:
-                return "[%s]" % color_expr_html(expr.args[0], loc_db)
+                return BRACKET_O + color_expr_html(expr.args[0], loc_db) + BRACKET_C
         elif isinstance(expr, m2_expr.ExprOp) and expr.op == 'segm':
             arg = expr.args[1]
             if isinstance(arg, m2_expr.ExprId):
@@ -430,7 +422,7 @@ class instruction_aarch64(instruction):
                     utils.set_html_text_color(arg.op, utils.COLOR_OP),
                     color_expr_html(arg.args[1], loc_db)
                 )
-            return '[%s, %s]' % (color_expr_html(expr.args[0], loc_db), arg)
+            return BRACKET_O + color_expr_html(expr.args[0], loc_db) + ', ' +  arg + BRACKET_C
 
         else:
             raise NotImplementedError("bad op")
@@ -1424,7 +1416,7 @@ class aarch64_immhi_page(aarch64_imm_32):
     def encode(self):
         v = int(self.expr)
         if v & (1 << 63):
-            v &= (1 << 33) - 1
+            v &= (1 << 21) - 1
         self.parent.immlo.value = v & 3
         v >>= 2
         if v > (1 << 19) - 1:
@@ -1909,6 +1901,10 @@ adsu_name = {'ADD': 0, 'SUB': 1}
 bs_adsu_name = bs_name(l=1, name=adsu_name)
 
 
+adsus_name = {'ADDS': 0, 'SUBS': 1}
+bs_adsus_name = bs_name(l=1, name=adsus_name)
+
+
 offs19 = bs(l=19, cls=(aarch64_offs,), fname='off')
 offs19pc = bs(l=19, cls=(aarch64_offs_pc,), fname='off')
 
@@ -1939,8 +1935,9 @@ aarch64op("CMN", [sf, bs('0'), bs('1'), bs('01011'), shift, bs('0'), rm_sft, imm
 
 aarch64op("cmp", [sf, bs('1'), bs('1'), bs('01011'), shift, bs('0'), rm_sft, imm6, rn, bs('11111')], [rn, rm_sft], alias=True)
 # add/sub (reg ext)
-aarch64op("addsub", [sf, bs_adsu_name, modf, bs('01011'), bs('00'), bs('1'), rm_ext, option, imm3, rn, rd], [rd, rn, rm_ext])
-#aarch64op("cmp",    [sf, bs('1'), bs('1'), bs('01011'), bs('00'), bs('1'), rm_ext, option, imm3, rn, bs('11111')], [rn, rm_ext], alias=True)
+aarch64op("addsub", [sf, bs_adsu_name, bs('0'), bs('01011'), bs('00'), bs('1'), rm_ext, option, imm3, rn, rd], [rd, rn, rm_ext])
+aarch64op("addssubs", [sf, bs_adsus_name, bs('1'), bs('01011'), bs('00'), bs('1'), rm_ext, option, imm3, rn, rd_nosp], [rd_nosp, rn, rm_ext])
+aarch64op("cmp",    [sf, bs('1'), bs('1'), bs('01011'), bs('00'), bs('1'), rm_ext, option, imm3, rn, bs('11111')], [rn, rm_ext], alias=True)
 
 
 aarch64op("neg", [sf, bs('1'), modf, bs('01011'), shift, bs('0'), rm_sft, imm6, bs('11111'), rd], [rd, rm_sft], alias=True)
